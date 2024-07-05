@@ -6,7 +6,7 @@
   "scripts": {
     "build": "webpack --config webpack.config.js --mode=production",
     "build:legacy": "env NODE_OPTIONS='--openssl-legacy-provider' webpack",
-    "start": "webpack-dev-server --open",
+    "start": "webpack-dev-server",
     "watch": "webpack --config webpack.config.js --watch --progress",
     "format": "prettier --ignore-path .gitignore --write '**/*.js'"
   },
@@ -20,27 +20,28 @@
     "acorn-jsx": "^5.0.2",
     "babel-loader": "^8.1.0",
     "babel-preset-react": "^6.24.1",
-    "css-loader": "^0.28.11",
-    "d3": "^5.12.0",
-    "d3-svg-legend": "^2.25.6",
+    "css-loader": "^7.1.2",
+    "d3": "^7.9.0",
+    "d3-svg-legend": "^1.13.0",
     "eslint": "^6.3.0",
     "eslint-config-prettier": "^6.2.0",
     "eslint-plugin-react": "^7.14.3",
     "js-yaml": "~3.13.1",
-    "jsdom": "^11.11.0",
+    "jsdom": "^24.1.0",
     "lodash": "^4.17.19",
     "moment": "^2.24.0",
     "react": "^16.8.3",
     "react-dom": "^16.7.0",
     "ssf": "^0.10.2",
     "styled-components": "6.1.8",
-    "to-string-loader": "^1.1.5",
-    "uglifyjs-webpack-plugin": "^1.2.5",
-    "webpack": "^4.39.3",
-    "webpack-cli": "^3.3.9",
-    "webpack-dev-server": "^3.7.1"
+    "to-string-loader": "^1.1.5"
   },
   "resolutions": {
     "js-yaml": "3.13.1"
+  },
+  "devDependencies": {
+    "webpack": "^5.92.1",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.0.4"
   }
 }

@@ -33,7 +33,8 @@ function RadarChart(id, data, options, moreData, colorSeries, originalData, axes
 	    legendFont: .8,			//font of legend items
 	    domainMax: null,
 	    labelScale: true,
-		labelFine: 1.2
+		labelFine: 1.2,
+		value_labels: false
 	};
 
 	//Put all of the options into a variable called cfg
@@ -233,9 +234,10 @@ function RadarChart(id, data, options, moreData, colorSeries, originalData, axes
 		.attr("x", function(d, i){ return rScale[i](maxValue[i]*cfg.labelFactor) * Math.cos(angleSlice*i - Math.PI/2); })
 		.attr("y", function(d, i){ return rScale[i](maxValue[i]*cfg.labelFactor) * Math.sin(angleSlice*i - Math.PI/2) - cfg.labelFine; })
 		.text(function(d){return d})
-		.call(wrap, cfg.wrapWidth);
+		.call(wrap, cfg.wrapWidth, cfg.value_labels);
   
   	//Draw the background circles
+	if (!cfg.polygon_background) {
   	if (cfg.roundStrokes) {
     	axisGrid.selectAll(".levels")
 		    .data(d3.range(1,(cfg.levels+1)).reverse())
@@ -321,6 +323,7 @@ function RadarChart(id, data, options, moreData, colorSeries, originalData, axes
 		    });
   		}
   	};
+};
 
 	/////////////////////////////////////////////////////////
 	///////////// Draw the radar chart blobs ////////////////
@@ -540,31 +543,32 @@ function RadarChart(id, data, options, moreData, colorSeries, originalData, axes
 	/////////////////////////////////////////////////////////
 
 	//Taken from http://bl.ocks.org/mbostock/7555321
+	//Modified to handle value labels on new line
 	//Wraps SVG text	
-	function wrap(text, width) {
-	  text.each(function() {
-		var text = d3.select(this),
-			words = text.text().split(/\s+/).reverse(),
-			word,
-			line = [],
-			lineNumber = 0,
-			lineHeight = 1.4, // ems
-			y = text.attr("y"),
-			x = text.attr("x"),
-			dy = parseFloat(text.attr("dy")),
-			tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
-			
-		while (word = words.pop()) {
-		  line.push(word);
-		  tspan.text(line.join(" "));
-		  if (tspan.node().getComputedTextLength() > width) {
-			line.pop();
+	function wrap(text, width, value_labels) {
+		text.each(function() {
+		  var text = d3.select(this),
+			  words = text.text().split(/\s+/).reverse(),
+			  word,
+			  line = [],
+			  lineNumber = 0,
+			  lineHeight = 1.4, // ems
+			  y = text.attr("y"),
+			  x = text.attr("x"),
+			  dy = parseFloat(text.attr("dy")),
+			  tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+
+		  while (word = words.pop()) {
+			line.push(word);
 			tspan.text(line.join(" "));
-			line = [word];
-			tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+			if (value_labels || tspan.node().getComputedTextLength() > width) {
+			  line.pop();
+			  tspan.text(line.join(" "));
+			  line = [word];
+			  tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+			}
 		  }
-		}
-	  });
+		});
 	}//wrap	
   
  	function toggleDataPoints(colorClass) {
@@ -753,6 +757,28 @@ const baseOptions = {
       	default: "left",
       	section: "Plot"
     },
+	polygon_background: {
+		type: "string",
+      	label: "Max Background Series?",
+      	display: "select",
+     	values: [
+      	 	{"true": true},
+      	 	{"false": false}
+      	],
+      	default: false,
+      	section: "Plot"
+	},
+	value_labels: {
+		type: "string",
+		label: "Show Value Labels?",
+		display: "select",
+	   	values: [
+			 {"true": true},
+			 {"false": false}
+		],
+		default: false,
+		section: "Plot"
+	}
 }
 
 
@@ -911,14 +937,53 @@ const visObject = {
 		//console.log(queryResponse['fields']['measure_like']);
 		qrn = queryResponse["fields"]["dimensions"][0].name;
 		axes = [];
+		const axisLabel = (d) => {
+			if (config.value_labels) {
+				const value = data[0][d['name']]['rendered'] ? data[0][d['name']]['rendered'] : data[0][d['name']]['value']
+				return d['label_short'] ? d['label_short'].trim() + " " + value : d['label'].trim() + " " + value;
+			} else {
+				return d['label_short'] ? d['label_short'].trim() : d['label'].trim()
+			}
+		}
 	    queryResponse['fields']['measure_like'].forEach(function(d) {
 	      axes.push({
 	        name: d['name'],
-	        label: d['label_short'] ? d['label_short'].trim() : d['label'].trim()
+	        label: axisLabel(d)
 	      });
 	    });
 	    formattedData = [];
 	    moreData = [];
+
+		// if the Polygon background is specified, add an additional series with max values
+		if (config.polygon_background) {
+			maxValues = [];
+			if (config.domain_max && config.domain_max > 0) {
+				axes.forEach(function(a) {
+					maxValues.push({
+						axis: a['label'],
+						name: a['name'],
+						value: config.domain_max,
+						rendered: config.domain_max,
+						links: ''
+					})
+				})
+			} else {
+				axes.forEach(function(a) {
+					maxValues.push({
+						axis: a['label'],
+						value: d3.max(data, function(d) { return d[a['name']]['value']; })
+					});
+				});
+			}
+			// Ensure the background series is structured correctly for drawing
+			formattedData.push(maxValues);
+			moreData.push({
+				label: String('Maximum'),
+				data: set,
+				color: config.backgroundColor
+			});
+		}
+		
 		data.forEach(function(d, index) {
 			values = []
 			axes.forEach(function(a) {
@@ -943,26 +1008,37 @@ const visObject = {
 		});
 		series = moreData.map(s => s.label);
 	}
-	//console.log(formattedData);
-	//console.log(moreData);
-	//color: index < 9 ? series_default[index] : lighten("#D13452", index*1.7),
+	
     opt = Object.assign({}, baseOptions)
 
-    moreData.forEach(function(s, index) {
-	    opt[`${s.label}_color`] = {
+	data.forEach(function(d,i) {
+		opt[`${d[qrn].value}_color`] = {
 	        type: `string`,
-	        label: `${s.label} - Color`,
+	        label: `${d[qrn].value} - Color`,
 	        display: `color`,
 	        section: "Series",
-	        default: `${s.color}`
+	        default: ` lighten("#D13452", 5*${i})`
 	        //default: baseConfig[`${s.label}_color`] ? baseConfig[`${s.label}_color`] : [series_default[index]],
 	    };
-  	});
+	  });
+    // measure_like.forEach(function(s, index) {
+	//     opt[`${s.label}_color`] = {
+	//         type: `string`,
+	//         label: `${s.label} - Color`,
+	//         display: `color`,
+	//         section: "Series",
+	//         default: `${s.color}`
+	//         //default: baseConfig[`${s.label}_color`] ? baseConfig[`${s.label}_color`] : [series_default[index]],
+	//     };
+  	// });
   	this.trigger('registerOptions', opt);
 
   	//var color = d3.scale.ordinal().range(moreData.map((d,index) => config[`${d.label}_color`] ? config[`${d.label}_color`] : [series_default[index]]));
 	var color = d3.scale.ordinal().range(Object.keys(config).filter(function(key){ return key.indexOf('_color') !== -1 }).map(function(d){ return config[d]}));
 
+	if(config.polygon_background) {
+		color = d3.scale.ordinal().range([config.backgroundColor, ...Object.keys(config).filter(function(key){ return key.indexOf('_color') !== -1 }).map(function(d){ return config[d]})]);	
+	}
 	let radarChartOptions1 = {}
 
 	if (config.levels) {
@@ -994,7 +1070,9 @@ const visObject = {
 			legendPad: config.legend_padding,
 			legendFont: config.legend_font,
 			domainMax: config.domain_max,
-			labelScale: config.labelScale
+			labelScale: config.labelScale,
+			value_labels: config.value_labels,
+			polygon_background: config.polygon_background
 		};
 		RadarChart("#vis", formattedData, radarChartOptions1, moreData, [], originalData, axes, doneRendering);
 	}

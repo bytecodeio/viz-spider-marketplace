@@ -1,14 +1,15 @@
 var path = require("path");
 
-const UglifyJSPlugin = require("uglifyjs-webpack-plugin");
-
 var webpackConfig = {
   mode: "production",
   entry: {
     spider: "./src/spider.js",
   },
   devServer: {
-    contentBase: __dirname,
+    static: __dirname,
+    server: {
+      type: 'https',
+    },
   },
   output: {
     filename: "bundle.js",
@@ -17,15 +18,17 @@ var webpackConfig = {
     libraryTarget: "umd",
   },
   resolve: {
-    extensions: [".js"],
+    extensions: [".js",".jsx"],
     modules: [path.join(__dirname, "../src"), "node_modules"],
   },
-  plugins: [new UglifyJSPlugin()],
   module: {
     rules: [
       { test: /\.(js|jsx)$/, use: "babel-loader" },
-      { test: /\.css$/, loader: ["to-string-loader", "css-loader"] },
+      { test: /\.css$/, use: ["to-string-loader", "css-loader"] },
     ],
+  },
+  cache: {
+    type: 'filesystem', // Use 'memory' for smaller projects
   },
   stats: {},
 };
